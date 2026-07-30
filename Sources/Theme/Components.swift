@@ -114,7 +114,7 @@ struct KTextField: View {
         } else {
             TextField(placeholder, text: $text)
                 .keyboardType(keyboardType)
-                .textInputAutocapitalization(isSecure ? .never : .automatic)
+                .textInputAutocapitalization(isSecure ? .never : .sentences)
                 .autocorrectionDisabled(isSecure)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
