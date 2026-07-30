@@ -64,6 +64,10 @@ struct KTextField: View {
     var keyboardType: UIKeyboardType = .default
     var errorMessage: String? = nil
 
+    /// Local reveal state for secure fields — toggled by the eye button below.
+    /// Purely a display concern; the bound `text` value is unaffected either way.
+    @State private var isRevealed = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
@@ -73,17 +77,33 @@ struct KTextField: View {
                 .foregroundColor(KTheme.textMuted)
                 .padding(.leading, 4)
 
-            Group {
+            HStack(spacing: 10) {
+                Group {
+                    if isSecure && !isRevealed {
+                        SecureField(placeholder, text: $text)
+                            .tint(.white)
+                    } else {
+                        TextField(placeholder, text: $text)
+                            .keyboardType(keyboardType)
+                            .textInputAutocapitalization(isSecure ? .never : .automatic)
+                            .autocorrectionDisabled(isSecure)
+                    }
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+
                 if isSecure {
-                    SecureField(placeholder, text: $text)
-                        .tint(.white)
-                } else {
-                    TextField(placeholder, text: $text)
-                        .keyboardType(keyboardType)
+                    Button {
+                        isRevealed.toggle()
+                    } label: {
+                        Image(systemName: isRevealed ? "eye.slash.fill" : "eye.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(KTheme.textMuted)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isRevealed ? "Hide password" : "Show password")
                 }
             }
-            .font(.system(size: 15, weight: .semibold))
-            .foregroundColor(.white)
             .padding(16)
             .background(KTheme.bgBase)
             .clipShape(RoundedRectangle(cornerRadius: 18))
