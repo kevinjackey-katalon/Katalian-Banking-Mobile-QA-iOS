@@ -23,10 +23,10 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleDisplayName: Katalian Banking - iOS
+        CFBundleDisplayName: Katalian Banking
     settings:
       base:
-        PRODUCT_NAME: Katalian Banking - iOS
+        PRODUCT_NAME: Katalian Banking
         PRODUCT_BUNDLE_IDENTIFIER: com.katalon.katalianbanking.mobileqa
         SWIFT_VERSION: "5.0"
         MARKETING_VERSION: "1.0"
