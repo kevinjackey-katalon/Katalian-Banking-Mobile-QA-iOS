@@ -109,8 +109,11 @@ struct KTextField: View {
         if isSecure && !isRevealed {
             SecureField(placeholder, text: $text)
                 .tint(.white)
-                .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
+                // Deliberately no .font() override here. SecureField's masked
+                // bullet glyphs can fail to render entirely (not just wrong
+                // color) when a custom .font() is applied — a known SwiftUI
+                // quirk. Letting it use the system default keeps the dots visible.
         } else {
             TextField(placeholder, text: $text)
                 .keyboardType(keyboardType)
