@@ -58,6 +58,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Katalian Banking - iOS
-          path: "Katalian Banking - iOS.ipa"
+          name: Katalian Banking
+          path: "Katalian Banking.ipa"
           if-no-files-found: error
