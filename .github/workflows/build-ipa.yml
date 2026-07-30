@@ -43,7 +43,7 @@ jobs:
       - name: Package .ipa
         run: |
           set -euo pipefail
-          APP_PATH="build/KatalianBankingMobileQA.xcarchive/Products/Applications/Katalian Banking - iOS.app"
+          APP_PATH="build/KatalianBankingMobileQA.xcarchive/Products/Applications/Katalian Banking.app"
           if [ ! -d "$APP_PATH" ]; then
             echo "ERROR: expected app bundle not found at: $APP_PATH"
             echo "Actual contents of Products/Applications:"
@@ -53,7 +53,7 @@ jobs:
           mkdir -p ipa_root/Payload
           cp -R "$APP_PATH" "ipa_root/Payload/"
           cd ipa_root
-          zip -r -X "../Katalian Banking - iOS.ipa" Payload
+          zip -r -X "../Katalian Banking.ipa" Payload
           cd ..
 
       - uses: actions/upload-artifact@v4
