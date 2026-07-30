@@ -76,6 +76,7 @@ struct KTextField: View {
             Group {
                 if isSecure {
                     SecureField(placeholder, text: $text)
+                        .tint(.white)
                 } else {
                     TextField(placeholder, text: $text)
                         .keyboardType(keyboardType)
