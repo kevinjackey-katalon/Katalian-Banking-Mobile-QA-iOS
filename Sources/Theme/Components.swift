@@ -107,13 +107,7 @@ struct KTextField: View {
     @ViewBuilder
     private var inputField: some View {
         if isSecure && !isRevealed {
-            SecureField(placeholder, text: $text)
-                .tint(.white)
-                .foregroundColor(.white)
-                // Deliberately no .font() override here. SecureField's masked
-                // bullet glyphs can fail to render entirely (not just wrong
-                // color) when a custom .font() is applied — a known SwiftUI
-                // quirk. Letting it use the system default keeps the dots visible.
+            maskedSecureField
         } else {
             TextField(placeholder, text: $text)
                 .keyboardType(keyboardType)
@@ -121,6 +115,49 @@ struct KTextField: View {
                 .autocorrectionDisabled(isSecure)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
+        }
+    }
+
+    // Custom masked field: a real, fully invisible TextField captures actual
+    // keyboard input (so it behaves like a normal field for focus, cursor,
+    // and selection), while a separate row of bullet dots we draw ourselves
+    // renders on top. This bypasses SwiftUI's SecureField entirely, since its
+    // built-in masked-glyph rendering proved unreliable on-device even after
+    // two standard fixes (tint color, then removing the custom font).
+    //
+    // Trade-off: being a plain TextField under the hood, this does not get
+    // iOS's built-in secure-entry protections (e.g. screenshot/screen-recording
+    // masking while typing). Acceptable for this QA/demo app with no real
+    // credentials — worth reconsidering if this component is reused for a
+    // field with real sensitive data.
+    private var maskedSecureField: some View {
+        ZStack(alignment: .leading) {
+            TextField("", text: $text)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.clear)
+                .tint(.clear)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .keyboardType(.default)
+
+            maskedOverlay
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var maskedOverlay: some View {
+        HStack(spacing: 5) {
+            if text.isEmpty {
+                Text(placeholder)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.35))
+            } else {
+                ForEach(0..<text.count, id: \.self) { _ in
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 7, height: 7)
+                }
+            }
         }
     }
 
