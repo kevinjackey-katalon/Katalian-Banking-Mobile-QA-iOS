@@ -55,7 +55,13 @@ struct KButton: View {
 }
 
 // MARK: - Input field (mirrors components/common/Input.tsx)
-
+// NOTE: body is deliberately split into small named subviews with explicit
+// `some View` return types. A single large expression here (nested
+// HStack -> Group -> if/else -> Button -> ternaries) can cause the Swift
+// type checker to time out in Release/whole-module builds ("unable to
+// type-check this expression in reasonable time"), which fails the whole
+// compile batch with no useful per-line diagnostic. Splitting it up avoids
+// that class of failure entirely.
 struct KTextField: View {
     var label: String
     @Binding var text: String
@@ -70,54 +76,77 @@ struct KTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(label)
-                .font(.system(size: 10, weight: .black))
-                .textCase(.uppercase)
-                .tracking(1.5)
-                .foregroundColor(KTheme.textMuted)
-                .padding(.leading, 4)
+            labelText
+            fieldRow
+            errorText
+        }
+    }
 
-            HStack(spacing: 10) {
-                Group {
-                    if isSecure && !isRevealed {
-                        SecureField(placeholder, text: $text)
-                            .tint(.white)
-                    } else {
-                        TextField(placeholder, text: $text)
-                            .keyboardType(keyboardType)
-                            .textInputAutocapitalization(isSecure ? .never : .automatic)
-                            .autocorrectionDisabled(isSecure)
-                    }
-                }
+    private var labelText: some View {
+        Text(label)
+            .font(.system(size: 10, weight: .black))
+            .textCase(.uppercase)
+            .tracking(1.5)
+            .foregroundColor(KTheme.textMuted)
+            .padding(.leading, 4)
+    }
+
+    private var fieldRow: some View {
+        HStack(spacing: 10) {
+            inputField
+            if isSecure {
+                revealToggleButton
+            }
+        }
+        .padding(16)
+        .background(KTheme.bgBase)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(fieldBorder)
+    }
+
+    @ViewBuilder
+    private var inputField: some View {
+        if isSecure && !isRevealed {
+            SecureField(placeholder, text: $text)
+                .tint(.white)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
+        } else {
+            TextField(placeholder, text: $text)
+                .keyboardType(keyboardType)
+                .textInputAutocapitalization(isSecure ? .never : .automatic)
+                .autocorrectionDisabled(isSecure)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+        }
+    }
 
-                if isSecure {
-                    Button {
-                        isRevealed.toggle()
-                    } label: {
-                        Image(systemName: isRevealed ? "eye.slash.fill" : "eye.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(KTheme.textMuted)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isRevealed ? "Hide password" : "Show password")
-                }
-            }
-            .padding(16)
-            .background(KTheme.bgBase)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(errorMessage == nil ? KTheme.border : KTheme.danger.opacity(0.6), lineWidth: 1)
-            )
+    private var revealToggleButton: some View {
+        let iconName = isRevealed ? "eye.slash.fill" : "eye.fill"
+        let a11yLabel = isRevealed ? "Hide password" : "Show password"
+        return Button {
+            isRevealed.toggle()
+        } label: {
+            Image(systemName: iconName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(KTheme.textMuted)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(a11yLabel)
+    }
 
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(KTheme.danger)
-                    .padding(.leading, 4)
-            }
+    private var fieldBorder: some View {
+        RoundedRectangle(cornerRadius: 18)
+            .stroke(errorMessage == nil ? KTheme.border : KTheme.danger.opacity(0.6), lineWidth: 1)
+    }
+
+    @ViewBuilder
+    private var errorText: some View {
+        if let errorMessage {
+            Text(errorMessage)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(KTheme.danger)
+                .padding(.leading, 4)
         }
     }
 }
@@ -143,21 +172,25 @@ struct KPicker<T: Hashable>: View {
                     }
                 }
             } label: {
-                HStack {
-                    Text(options.first(where: { $0.0 == selection })?.1 ?? "Select…")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
-                    Spacer()
-                    Image(systemName: "chevron.down")
-                        .foregroundColor(KTheme.textMuted)
-                        .font(.system(size: 12, weight: .bold))
-                }
-                .padding(16)
-                .background(KTheme.bgBase)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .overlay(RoundedRectangle(cornerRadius: 18).stroke(KTheme.border, lineWidth: 1))
+                pickerLabel
             }
         }
+    }
+
+    private var pickerLabel: some View {
+        HStack {
+            Text(options.first(where: { $0.0 == selection })?.1 ?? "Select…")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+            Spacer()
+            Image(systemName: "chevron.down")
+                .foregroundColor(KTheme.textMuted)
+                .font(.system(size: 12, weight: .bold))
+        }
+        .padding(16)
+        .background(KTheme.bgBase)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(KTheme.border, lineWidth: 1))
     }
 }
 
