@@ -146,19 +146,25 @@ struct KTextField: View {
     }
 
     private var maskedOverlay: some View {
-        HStack(spacing: 5) {
+        Group {
             if text.isEmpty {
                 Text(placeholder)
-                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white.opacity(0.35))
             } else {
-                ForEach(0..<text.count, id: \.self) { _ in
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 7, height: 7)
-                }
+                // A single Text with the full repeated-bullet string, rather
+                // than a ForEach of individual dot views. ForEach tracks each
+                // item's identity separately, which let old dots persist and
+                // shift as new characters were typed instead of the row being
+                // replaced atomically. A single Text has no per-character
+                // identity to track, so the rendered dot count always exactly
+                // matches text.count with no stale leftovers.
+                Text(String(repeating: "●", count: text.count))
+                    .foregroundColor(.white)
+                    .kerning(3)
             }
         }
+        .font(.system(size: 15, weight: .semibold))
+        .animation(nil, value: text)
     }
 
     private var revealToggleButton: some View {
