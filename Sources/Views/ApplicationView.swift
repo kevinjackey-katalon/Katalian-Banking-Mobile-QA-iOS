@@ -77,13 +77,17 @@ struct ApplicationView: View {
             Text("Identity Verification").font(.system(size: 20, weight: .black)).foregroundColor(.white)
             Text("Please provide your legal credentials as they appear on official documents.")
                 .font(.system(size: 13)).foregroundColor(KTheme.textMuted)
-            KTextField(label: "Legal First Name", text: $firstName, errorMessage: errors["firstName"])
-            KTextField(label: "Middle Name", text: $middleName)
-            KTextField(label: "Legal Last Name", text: $lastName, errorMessage: errors["lastName"])
+            KTextField(label: "Legal First Name", text: $firstName, kind: .name, contentType: .givenName,
+                       errorMessage: errors["firstName"], identifier: "application_first_name")
+            KTextField(label: "Middle Name", text: $middleName, kind: .name, contentType: .middleName,
+                       identifier: "application_middle_name")
+            KTextField(label: "Legal Last Name", text: $lastName, kind: .name, contentType: .familyName,
+                       errorMessage: errors["lastName"], identifier: "application_last_name")
             DatePicker("Date of Birth", selection: $dob, displayedComponents: .date)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.white)
                 .tint(KTheme.emerald)
+                .accessibilityIdentifier("application_dob")
         }
     }
 
@@ -92,10 +96,14 @@ struct ApplicationView: View {
             Text("Residence Information").font(.system(size: 20, weight: .black)).foregroundColor(.white)
             Text("Your primary physical address for regulatory compliance.")
                 .font(.system(size: 13)).foregroundColor(KTheme.textMuted)
-            KTextField(label: "Primary Address Line", text: $address, errorMessage: errors["address"])
-            KTextField(label: "City", text: $city, errorMessage: errors["city"])
-            KPicker(label: "State", selection: $state, options: Constants.states.map { ($0, $0) })
-            KTextField(label: "Zip Code", text: $zip, keyboardType: .numberPad, errorMessage: errors["zip"])
+            KTextField(label: "Primary Address Line", text: $address, kind: .address, contentType: .streetAddressLine1,
+                       errorMessage: errors["address"], identifier: "application_address")
+            KTextField(label: "City", text: $city, kind: .address, contentType: .addressCity,
+                       errorMessage: errors["city"], identifier: "application_city")
+            KPicker(label: "State", selection: $state, options: Constants.states.map { ($0, $0) },
+                    identifier: "application_state")
+            KTextField(label: "Zip Code", text: $zip, kind: .digits, contentType: .postalCode,
+                       errorMessage: errors["zip"], identifier: "application_zip", maxLength: 5)
         }
     }
 
@@ -104,9 +112,11 @@ struct ApplicationView: View {
             Text("Initial Asset Allocation").font(.system(size: 20, weight: .black)).foregroundColor(.white)
             Text("Set your starting liquidity for this new facility.")
                 .font(.system(size: 13)).foregroundColor(KTheme.textMuted)
-            KTextField(label: "Funding Amount ($)", text: $initialDeposit, placeholder: "0.00", keyboardType: .decimalPad)
+            KTextField(label: "Funding Amount ($)", text: $initialDeposit, placeholder: "0.00", kind: .decimal,
+                       identifier: "application_funding_amount")
             KPicker(label: "Transfer From Existing Account", selection: $depositFromAccountId,
-                    options: [("", "External Wire / New Funds")] + (appState.currentUser?.accounts ?? []).filter { $0.type == .checking || $0.type == .savings }.map { ($0.id, "\($0.type.rawValue) (Ending \($0.accountNumber.suffix(4)))") })
+                    options: [("", "External Wire / New Funds")] + (appState.currentUser?.accounts ?? []).filter { $0.type == .checking || $0.type == .savings }.map { ($0.id, "\($0.type.rawValue) (Ending \($0.accountNumber.suffix(4)))") },
+                    identifier: "application_funding_source")
         }
     }
 
