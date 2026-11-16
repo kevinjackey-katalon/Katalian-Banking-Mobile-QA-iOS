@@ -77,7 +77,8 @@ struct DepositView: View {
             }
 
             KPicker(label: "Destination Facility", selection: $toAccountId, options: (user?.accounts ?? []).map { ($0.id, "\($0.type.rawValue) - \($0.accountNumber)") })
-            KTextField(label: "Provision Amount ($)", text: $amountText, placeholder: "0.00", keyboardType: .decimalPad)
+            KTextField(label: "Provision Amount ($)", text: $amountText, placeholder: "0.00", kind: .decimal,
+                       identifier: "deposit_amount")
         }
     }
 
