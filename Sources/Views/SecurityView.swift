@@ -96,7 +96,8 @@ struct SecurityView: View {
                 Text("Asset Compromise Report").font(.system(size: 20, weight: .black)).foregroundColor(.white)
                 Text("Identify the specific facility that has been compromised.").font(.system(size: 13)).foregroundColor(KTheme.textMuted)
                 KPicker(label: "Affected Facility", selection: $selectedAssetId, options: (user?.accounts ?? []).map { ($0.id, "\($0.type.rawValue) (Ending \($0.accountNumber.suffix(4)))") })
-                KTextField(label: "Incident Narrative", text: $incidentDescription, placeholder: "Describe the nature of the compromise…")
+                KTextField(label: "Incident Narrative", text: $incidentDescription, placeholder: "Describe the nature of the compromise…",
+                           kind: .multiline, identifier: "security_incident_narrative")
                 HStack {
                     KButton(title: "Cancel", variant: .secondary) { appState.navigate(to: .contact) }
                     KButton(title: "Authorize Asset Freeze", variant: .danger, fullWidth: true, isDisabled: incidentDescription.trimmingCharacters(in: .whitespaces).isEmpty) { step = 2 }
