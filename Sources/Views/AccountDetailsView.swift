@@ -74,7 +74,7 @@ struct AccountDetailsView: View {
                         .foregroundColor(.white)
                 }
                 Spacer()
-                KButton(title: isGeneratingPDF ? "Provisioning…" : "Statement", variant: .secondary, isDisabled: isGeneratingPDF) {
+                KButton(title: isGeneratingPDF ? "Provisioning…" : "Statement", variant: .secondary, isDisabled: isGeneratingPDF, identifier: "account_statement") {
                     generateStatement()
                 }
             }
