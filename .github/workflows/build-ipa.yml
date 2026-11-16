@@ -20,11 +20,6 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same PR/branch supersedes an in-flight build.
-concurrency:
-  group: build-ipa-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     runs-on: macos-14
