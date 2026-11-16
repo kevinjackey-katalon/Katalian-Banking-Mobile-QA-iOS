@@ -68,27 +68,37 @@ struct LoanApplicationView: View {
             VStack(alignment: .leading, spacing: 18) {
                 Text("Personal Verification").font(.system(size: 20, weight: .black)).foregroundColor(.white)
                 Text("Verify your identity for the lending institution.").font(.system(size: 13)).foregroundColor(KTheme.textMuted)
-                KTextField(label: "First Name", text: $firstName)
-                KTextField(label: "Last Name", text: $lastName)
+                KTextField(label: "First Name", text: $firstName, kind: .name, contentType: .givenName,
+                           identifier: "loan_first_name")
+                KTextField(label: "Last Name", text: $lastName, kind: .name, contentType: .familyName,
+                           identifier: "loan_last_name")
                 DatePicker("Date of Birth", selection: $dob, displayedComponents: .date)
                     .foregroundColor(.white).tint(KTheme.emerald)
-                KTextField(label: "Primary Residence", text: $address)
+                    .accessibilityIdentifier("loan_dob")
+                KTextField(label: "Primary Residence", text: $address, kind: .address,
+                           contentType: .streetAddressLine1, identifier: "loan_address")
             }
         case 2:
             VStack(alignment: .leading, spacing: 18) {
                 Text("Capital & Employment").font(.system(size: 20, weight: .black)).foregroundColor(.white)
                 Text("Verify your income sources for risk assessment.").font(.system(size: 13)).foregroundColor(KTheme.textMuted)
-                KTextField(label: "Current Employer", text: $employer)
-                KTextField(label: "Job Title", text: $jobTitle)
-                KTextField(label: "Annual Income ($)", text: $annualIncome, keyboardType: .decimalPad)
+                KTextField(label: "Current Employer", text: $employer, kind: .name, contentType: .organizationName,
+                           identifier: "loan_employer")
+                KTextField(label: "Job Title", text: $jobTitle, kind: .name, contentType: .jobTitle,
+                           identifier: "loan_job_title")
+                KTextField(label: "Annual Income ($)", text: $annualIncome, kind: .decimal,
+                           identifier: "loan_annual_income")
             }
         case 3:
             VStack(alignment: .leading, spacing: 18) {
                 Text("Facility Requirements").font(.system(size: 20, weight: .black)).foregroundColor(.white)
                 Text("Define repayment and utilization parameters.").font(.system(size: 13)).foregroundColor(KTheme.textMuted)
-                KTextField(label: "Required Amount ($)", text: $loanAmount, keyboardType: .decimalPad)
-                KPicker(label: "Proposed Term", selection: $loanTerm, options: [(12, "12 Months"), (24, "24 Months"), (36, "36 Months")])
-                KTextField(label: "Purpose", text: $purpose, placeholder: "Description of capital utilization…")
+                KTextField(label: "Required Amount ($)", text: $loanAmount, kind: .decimal,
+                           identifier: "loan_amount")
+                KPicker(label: "Proposed Term", selection: $loanTerm, options: [(12, "12 Months"), (24, "24 Months"), (36, "36 Months")],
+                        identifier: "loan_term")
+                KTextField(label: "Purpose", text: $purpose, placeholder: "Description of capital utilization…",
+                           identifier: "loan_purpose")
             }
         default: EmptyView()
         }
