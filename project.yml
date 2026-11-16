@@ -24,6 +24,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CFBundleDisplayName: Katalian Banking
+        UIRequiredDeviceCapabilities:
+          - arm64
     settings:
       base:
         PRODUCT_NAME: Katalian Banking
