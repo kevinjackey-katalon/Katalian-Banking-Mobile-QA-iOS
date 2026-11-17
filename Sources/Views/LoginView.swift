@@ -8,6 +8,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @State private var focusPassword = false
 
     var body: some View {
         ScrollView {
@@ -51,13 +52,17 @@ struct LoginView: View {
                         }
 
                         VStack(spacing: 16) {
-                            KTextField(label: "Secure ID", text: $username, placeholder: "USER_0000")
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                            KTextField(label: "Access Code", text: $password, placeholder: "••••••••", isSecure: true)
+                            KTextField(label: "Secure ID", text: $username, placeholder: "USER_0000",
+                                       kind: .username, identifier: "login_username",
+                                       submitLabel: .next, onReturn: { focusPassword = true })
+                            KTextField(label: "Access Code", text: $password, placeholder: "••••••••",
+                                       kind: .password, identifier: "login_password",
+                                       submitLabel: .go, onReturn: { submit() },
+                                       focusRequest: $focusPassword)
                         }
 
-                        KButton(title: isLoading ? "Authorizing…" : "Enter Vault Access", fullWidth: true, isDisabled: isLoading) {
+                        KButton(title: isLoading ? "Authorizing…" : "Enter Vault Access", fullWidth: true,
+                                isDisabled: isLoading, identifier: "login_submit") {
                             submit()
                         }
 
@@ -68,6 +73,7 @@ struct LoginView: View {
                         .textCase(.uppercase)
                         .tracking(1.2)
                         .foregroundColor(KTheme.textMuted)
+                        .accessibilityIdentifier("login_forgot_password")
                     }
                     .padding(32)
                 }
@@ -86,6 +92,8 @@ struct LoginView: View {
     }
 
     private func submit() {
+        guard !isLoading else { return }
+        KKeyboard.dismiss()
         errorMessage = nil
         isLoading = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {

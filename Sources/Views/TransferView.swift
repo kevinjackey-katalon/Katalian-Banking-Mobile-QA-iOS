@@ -81,7 +81,8 @@ struct TransferView: View {
                     creditPaymentHelper(toAccount)
                 }
 
-                KTextField(label: "Liquid Capital Amount", text: $amountText, placeholder: "0.00", keyboardType: .decimalPad)
+                KTextField(label: "Liquid Capital Amount", text: $amountText, placeholder: "0.00", kind: .decimal,
+                           identifier: "transfer_amount")
 
                 HStack(spacing: 12) {
                     KButton(title: "Cancel", variant: .ghost) { dismiss() }
@@ -145,7 +146,7 @@ struct TransferView: View {
 
                 HStack(spacing: 12) {
                     KButton(title: "Back", variant: .secondary) { isConfirming = false }
-                    KButton(title: isSubmitting ? "Authorizing…" : "Authorize \(isCreditPayment ? "Payment" : "Transfer")", fullWidth: true, isDisabled: isSubmitting) {
+                    KButton(title: isSubmitting ? "Authorizing…" : "Authorize \(isCreditPayment ? "Payment" : "Transfer")", fullWidth: true, isDisabled: isSubmitting, identifier: "transfer_authorize") {
                         confirm()
                     }
                 }

@@ -23,6 +23,8 @@ struct KBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(KTheme.bgBase.ignoresSafeArea())
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar { KKeyboardDoneToolbar() }
     }
 }
 

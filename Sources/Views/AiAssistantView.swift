@@ -30,6 +30,7 @@ struct AiAssistantView: View {
                     .clipShape(Capsule())
                     .shadow(radius: 8)
                 }
+                .accessibilityIdentifier("ai_assistant_open")
             }
         }
     }
@@ -42,8 +43,13 @@ struct AiAssistantView: View {
                     .foregroundColor(.white)
                 Spacer()
                 Button { isOpen = false } label: {
-                    Image(systemName: "xmark").foregroundColor(.white.opacity(0.8))
+                    Image(systemName: "xmark")
+                        .foregroundColor(.white.opacity(0.8))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("Close")
+                .accessibilityIdentifier("ai_assistant_close")
             }
             .padding(16)
             .background(KTheme.cyan.opacity(0.9))
@@ -81,9 +87,14 @@ struct AiAssistantView: View {
                 TextField("Ask a question…", text: $query)
                     .font(.system(size: 13))
                     .foregroundColor(.white)
+                    .textInputAutocapitalization(.sentences)
+                    .submitLabel(.send)
+                    .onSubmit { submitQuery() }
                     .padding(12)
                     .background(KTheme.bgBase)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityLabel("Ask AI Assistant")
+                    .accessibilityIdentifier("ai_assistant_query")
                 Button { ask() } label: {
                     Image(systemName: "paperplane.fill")
                         .foregroundColor(.white)
@@ -92,6 +103,8 @@ struct AiAssistantView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .disabled(query.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+                .accessibilityLabel("Send question")
+                .accessibilityIdentifier("ai_assistant_send")
             }
             .padding(16)
             .background(KTheme.bgCard)
@@ -101,6 +114,11 @@ struct AiAssistantView: View {
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .overlay(RoundedRectangle(cornerRadius: 24).stroke(KTheme.cyan.opacity(0.3), lineWidth: 1))
         .shadow(radius: 20)
+    }
+
+    private func submitQuery() {
+        guard !query.trimmingCharacters(in: .whitespaces).isEmpty, !isLoading else { return }
+        ask()
     }
 
     private func ask() {

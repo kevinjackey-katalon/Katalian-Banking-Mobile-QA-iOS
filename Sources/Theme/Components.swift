@@ -1,4 +1,47 @@
 import SwiftUI
+import UIKit
+
+// MARK: - Helpers
+
+extension String {
+    /// Stable accessibility identifier derived from a visible label,
+    /// e.g. "Access Code" -> "access_code".
+    var kIdentifier: String {
+        var out = ""
+        var lastWasSeparator = false
+        for ch in lowercased() {
+            if ch.isASCII && (ch.isLetter || ch.isNumber) {
+                out.append(ch)
+                lastWasSeparator = false
+            } else if !lastWasSeparator && !out.isEmpty {
+                out.append("_")
+                lastWasSeparator = true
+            }
+        }
+        if out.hasSuffix("_") { out.removeLast() }
+        return out
+    }
+}
+
+enum KKeyboard {
+    /// Dismisses whatever keyboard is currently showing.
+    static func dismiss() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
+/// "Done" button above the keyboard. Needed because .decimalPad / .numberPad
+/// have no Return key. Add it ONCE per screen (see KBackground) - adding it to
+/// every field would show duplicate buttons.
+struct KKeyboardDoneToolbar: ToolbarContent {
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("Done") { KKeyboard.dismiss() }
+                .accessibilityIdentifier("keyboard_done")
+        }
+    }
+}
 
 // MARK: - Button variants (mirrors components/common/Button.tsx)
 
@@ -9,12 +52,17 @@ struct KButton: View {
     var variant: KButtonVariant = .primary
     var fullWidth: Bool = false
     var isDisabled: Bool = false
+    /// Stable accessibility identifier. Defaults to one derived from `title`;
+    /// pass an explicit value when the title changes (e.g. "Authorizing…").
+    var identifier: String? = nil
     var action: () -> Void
+
+    @ScaledMetric(relativeTo: .body) private var fontSize: CGFloat = 15
 
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 15, weight: .black, design: .rounded))
+                .font(.system(size: fontSize, weight: .black, design: .rounded))
                 .textCase(.uppercase)
                 .tracking(0.5)
                 .frame(maxWidth: fullWidth ? .infinity : nil)
@@ -30,6 +78,7 @@ struct KButton: View {
         .clipShape(RoundedRectangle(cornerRadius: KTheme.pillRadius))
         .opacity(isDisabled ? 0.5 : 1)
         .disabled(isDisabled)
+        .accessibilityIdentifier(identifier ?? title.kIdentifier)
     }
 
     private var background: Color {
@@ -54,6 +103,82 @@ struct KButton: View {
     }
 }
 
+// MARK: - Input kinds
+
+/// What a text field is for. Each kind maps to the iOS-standard keyboard,
+/// capitalization, autocorrect, content type (AutoFill) and input filter.
+enum KInputKind {
+    case text        // free-form single line: sentence caps, autocorrect on
+    case name        // person / company names: word caps, no autocorrect
+    case username    // login identifier: ASCII keyboard, no caps, no autocorrect
+    case password    // real secure entry (see KSecureInput)
+    case address     // street / city: word caps, no autocorrect
+    case decimal     // currency: decimal pad, digits + one separator, 2 decimals
+    case digits      // digits only (ZIP): number pad
+    case multiline   // free-form multi-line narrative
+
+    var keyboardType: UIKeyboardType {
+        switch self {
+        case .username: return .asciiCapable
+        case .decimal: return .decimalPad
+        case .digits: return .numberPad
+        case .text, .name, .password, .address, .multiline: return .default
+        }
+    }
+
+    var capitalization: TextInputAutocapitalization {
+        switch self {
+        case .name, .address: return .words
+        case .username, .password, .decimal, .digits: return .never
+        case .text, .multiline: return .sentences
+        }
+    }
+
+    var allowsAutocorrect: Bool {
+        switch self {
+        case .text, .multiline: return true
+        case .name, .username, .password, .address, .decimal, .digits: return false
+        }
+    }
+
+    var defaultContentType: UITextContentType? {
+        switch self {
+        case .username: return .username
+        case .password: return .password
+        case .text, .name, .address, .decimal, .digits, .multiline: return nil
+        }
+    }
+
+    /// Strips characters the kind can never contain (covers paste, which the
+    /// number pads cannot prevent).
+    func sanitize(_ input: String) -> String {
+        switch self {
+        case .decimal: return KInputKind.sanitizeDecimal(input)
+        case .digits: return input.filter { $0.isASCII && $0.isNumber }
+        case .text, .name, .username, .password, .address, .multiline: return input
+        }
+    }
+
+    private static func sanitizeDecimal(_ input: String) -> String {
+        var result = ""
+        var seenSeparator = false
+        var fractionDigits = 0
+        for ch in input {
+            if ch.isASCII && ch.isNumber {
+                if seenSeparator {
+                    if fractionDigits >= 2 { continue }
+                    fractionDigits += 1
+                }
+                result.append(ch)
+            } else if (ch == "." || ch == ",") && !seenSeparator {
+                seenSeparator = true
+                result.append(".")
+            }
+        }
+        return result
+    }
+}
+
 // MARK: - Input field (mirrors components/common/Input.tsx)
 // NOTE: body is deliberately split into small named subviews with explicit
 // `some View` return types. A single large expression here (nested
@@ -66,13 +191,29 @@ struct KTextField: View {
     var label: String
     @Binding var text: String
     var placeholder: String = ""
-    var isSecure: Bool = false
-    var keyboardType: UIKeyboardType = .default
+    var kind: KInputKind = .text
+    /// Overrides the kind's default AutoFill content type (e.g. .givenName).
+    var contentType: UITextContentType? = nil
     var errorMessage: String? = nil
+    /// Stable accessibility identifier. Defaults to one derived from `label`.
+    var identifier: String? = nil
+    var maxLength: Int? = nil
+    var submitLabel: SubmitLabel = .next
+    /// Called when the keyboard's Return key is pressed.
+    var onReturn: (() -> Void)? = nil
+    /// Password fields only: set to true to move keyboard focus into the field.
+    var focusRequest: Binding<Bool>? = nil
 
-    /// Local reveal state for secure fields — toggled by the eye button below.
+    /// Local reveal state for password fields - toggled by the eye button below.
     /// Purely a display concern; the bound `text` value is unaffected either way.
     @State private var isRevealed = false
+    @ScaledMetric(relativeTo: .body) private var bodySize: CGFloat = 15
+    @ScaledMetric(relativeTo: .caption) private var labelSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .caption) private var errorSize: CGFloat = 11
+
+    private var fieldID: String { identifier ?? label.kIdentifier }
+    private var effectiveContentType: UITextContentType? { contentType ?? kind.defaultContentType }
+    private var promptText: Text { Text(placeholder).foregroundColor(Color.white.opacity(0.5)) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -84,21 +225,25 @@ struct KTextField: View {
 
     private var labelText: some View {
         Text(label)
-            .font(.system(size: 10, weight: .black))
+            .font(.system(size: labelSize, weight: .black))
             .textCase(.uppercase)
             .tracking(1.5)
             .foregroundColor(KTheme.textMuted)
             .padding(.leading, 4)
+            // The field itself carries this label as its accessible name.
+            .accessibilityHidden(true)
     }
 
     private var fieldRow: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 0) {
             inputField
-            if isSecure {
+                .padding(.vertical, 16)
+                .padding(.leading, 16)
+                .padding(.trailing, kind == .password ? 4 : 16)
+            if kind == .password {
                 revealToggleButton
             }
         }
-        .padding(16)
         .background(KTheme.bgBase)
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay(fieldBorder)
@@ -106,79 +251,78 @@ struct KTextField: View {
 
     @ViewBuilder
     private var inputField: some View {
-        if isSecure && !isRevealed {
-            maskedSecureField
-        } else {
-            TextField(placeholder, text: $text)
-                .keyboardType(keyboardType)
-                .textInputAutocapitalization(isSecure ? .never : .sentences)
-                .autocorrectionDisabled(isSecure)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
+        switch kind {
+        case .password:
+            secureInput
+        case .multiline:
+            multilineField
+        case .text, .name, .username, .address, .decimal, .digits:
+            singleLineField
         }
     }
 
-    // Custom masked field: a real, fully invisible TextField captures actual
-    // keyboard input (so it behaves like a normal field for focus, cursor,
-    // and selection), while a separate row of bullet dots we draw ourselves
-    // renders on top. This bypasses SwiftUI's SecureField entirely, since its
-    // built-in masked-glyph rendering proved unreliable on-device even after
-    // two standard fixes (tint color, then removing the custom font).
-    //
-    // Trade-off: being a plain TextField under the hood, this does not get
-    // iOS's built-in secure-entry protections (e.g. screenshot/screen-recording
-    // masking while typing). Acceptable for this QA/demo app with no real
-    // credentials — worth reconsidering if this component is reused for a
-    // field with real sensitive data.
-    private var maskedSecureField: some View {
-        ZStack(alignment: .leading) {
-            TextField("", text: $text)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.clear)
-                .tint(.clear)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-                .keyboardType(.default)
-
-            maskedOverlay
-                .allowsHitTesting(false)
-        }
+    private var singleLineField: some View {
+        TextField(label, text: $text, prompt: promptText)
+            .keyboardType(kind.keyboardType)
+            .textInputAutocapitalization(kind.capitalization)
+            .autocorrectionDisabled(!kind.allowsAutocorrect)
+            .textContentType(effectiveContentType)
+            .submitLabel(submitLabel)
+            .onSubmit { onReturn?() }
+            .font(.system(size: bodySize, weight: .semibold))
+            .foregroundColor(.white)
+            .accessibilityLabel(label)
+            .accessibilityHint(errorMessage ?? "")
+            .accessibilityIdentifier(fieldID)
+            .onChange(of: text) { _, newValue in applyFilter(newValue) }
     }
 
-    private var maskedOverlay: some View {
-        Group {
-            if text.isEmpty {
-                Text(placeholder)
-                    .foregroundColor(.white.opacity(0.35))
-            } else {
-                // A single Text with the full repeated-bullet string, rather
-                // than a ForEach of individual dot views. ForEach tracks each
-                // item's identity separately, which let old dots persist and
-                // shift as new characters were typed instead of the row being
-                // replaced atomically. A single Text has no per-character
-                // identity to track, so the rendered dot count always exactly
-                // matches text.count with no stale leftovers.
-                Text(String(repeating: "●", count: text.count))
-                    .foregroundColor(.white)
-                    .kerning(3)
-            }
-        }
-        .font(.system(size: 15, weight: .semibold))
-        .animation(nil, value: text)
+    private var multilineField: some View {
+        TextField(label, text: $text, prompt: promptText, axis: .vertical)
+            .lineLimit(3...6)
+            .keyboardType(kind.keyboardType)
+            .textInputAutocapitalization(kind.capitalization)
+            .autocorrectionDisabled(!kind.allowsAutocorrect)
+            .font(.system(size: bodySize, weight: .semibold))
+            .foregroundColor(.white)
+            .accessibilityLabel(label)
+            .accessibilityHint(errorMessage ?? "")
+            .accessibilityIdentifier(fieldID)
+    }
+
+    /// A real secure text field (UITextField.isSecureTextEntry), not an imitation:
+    /// iOS masks it, VoiceOver does not read the characters, copy is disabled,
+    /// Password AutoFill works, and XCUITest/Appium see a SecureTextField.
+    private var secureInput: some View {
+        KSecureInput(
+            text: $text,
+            placeholder: placeholder,
+            isRevealed: isRevealed,
+            accessibilityLabel: label,
+            identifier: fieldID,
+            focusRequest: focusRequest ?? Binding.constant(false),
+            onReturn: onReturn
+        )
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var revealToggleButton: some View {
-        let iconName = isRevealed ? "eye.slash.fill" : "eye.fill"
-        let a11yLabel = isRevealed ? "Hide password" : "Show password"
-        return Button {
+        // 44x44pt is Apple's minimum touch target. The label stays constant and
+        // the state is exposed as a value, so automation can find it reliably.
+        Button {
             isRevealed.toggle()
         } label: {
-            Image(systemName: iconName)
+            Image(systemName: isRevealed ? "eye.slash.fill" : "eye.fill")
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(KTheme.textMuted)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(a11yLabel)
+        .accessibilityLabel("Show password")
+        .accessibilityValue(isRevealed ? "On" : "Off")
+        .accessibilityAddTraits(.isToggle)
+        .accessibilityIdentifier(fieldID + "_visibility_toggle")
     }
 
     private var fieldBorder: some View {
@@ -190,26 +334,151 @@ struct KTextField: View {
     private var errorText: some View {
         if let errorMessage {
             Text(errorMessage)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: errorSize, weight: .semibold))
                 .foregroundColor(KTheme.danger)
                 .padding(.leading, 4)
+                .accessibilityIdentifier(fieldID + "_error")
+        }
+    }
+
+    private func applyFilter(_ newValue: String) {
+        var cleaned = kind.sanitize(newValue)
+        if let maxLength, cleaned.count > maxLength {
+            cleaned = String(cleaned.prefix(maxLength))
+        }
+        if cleaned != newValue {
+            text = cleaned
         }
     }
 }
+
+// MARK: - Secure text entry
+
+struct KSecureInput: UIViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var isRevealed: Bool
+    var accessibilityLabel: String
+    var identifier: String
+    @Binding var focusRequest: Bool
+    var onReturn: (() -> Void)?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField()
+        field.delegate = context.coordinator
+        field.addTarget(context.coordinator, action: #selector(Coordinator.textChanged(_:)), for: .editingChanged)
+
+        // Explicit colors: SwiftUI's SecureField let the masked dots fall back to
+        // a dark default, invisible on this app's near-black fields. UITextField
+        // applies textColor to the dots directly.
+        field.textColor = .white
+        field.tintColor = .white
+        field.keyboardAppearance = .dark
+        field.font = UIFontMetrics(forTextStyle: .body)
+            .scaledFont(for: UIFont.systemFont(ofSize: 15, weight: .semibold))
+        field.adjustsFontForContentSizeCategory = true
+        field.attributedPlaceholder = NSAttributedString(
+            string: placeholder,
+            attributes: [.foregroundColor: UIColor(white: 1.0, alpha: 0.5)]
+        )
+
+        // Password-field behavior: no capitalization/correction/suggestions,
+        // password content type so Password AutoFill and strong passwords work.
+        field.autocapitalizationType = .none
+        field.autocorrectionType = .no
+        field.spellCheckingType = .no
+        field.smartQuotesType = .no
+        field.smartDashesType = .no
+        field.smartInsertDeleteType = .no
+        field.keyboardType = .default
+        field.textContentType = .password
+        field.returnKeyType = .go
+        field.clearButtonMode = .never
+        field.isSecureTextEntry = !isRevealed
+
+        field.accessibilityLabel = accessibilityLabel
+        field.accessibilityIdentifier = identifier
+
+        // Let SwiftUI size the field to the available width.
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        context.coordinator.parent = self
+
+        if field.text != text {
+            field.text = text
+        }
+
+        let wantsSecure = !isRevealed
+        if field.isSecureTextEntry != wantsSecure {
+            // Toggling secure entry on a field that already has text makes UIKit
+            // discard the existing text on the next keystroke. Re-assigning the
+            // text after the toggle keeps it.
+            let existing = field.text
+            field.isSecureTextEntry = wantsSecure
+            field.text = ""
+            field.text = existing
+        }
+
+        if focusRequest {
+            DispatchQueue.main.async {
+                field.becomeFirstResponder()
+                focusRequest = false
+            }
+        }
+    }
+
+    final class Coordinator: NSObject, UITextFieldDelegate {
+        var parent: KSecureInput
+
+        init(_ parent: KSecureInput) {
+            self.parent = parent
+        }
+
+        @objc func textChanged(_ sender: UITextField) {
+            parent.text = sender.text ?? ""
+        }
+
+        func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+            parent.onReturn?()
+            textField.resignFirstResponder()
+            return false
+        }
+    }
+}
+
+// MARK: - Picker
 
 struct KPicker<T: Hashable>: View {
     var label: String
     @Binding var selection: T
     var options: [(T, String)]
+    /// Stable accessibility identifier. Defaults to one derived from `label`.
+    var identifier: String? = nil
+
+    @ScaledMetric(relativeTo: .body) private var bodySize: CGFloat = 15
+    @ScaledMetric(relativeTo: .caption) private var labelSize: CGFloat = 10
+
+    private var selectedTitle: String {
+        options.first(where: { $0.0 == selection })?.1 ?? "Select…"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(label)
-                .font(.system(size: 10, weight: .black))
+                .font(.system(size: labelSize, weight: .black))
                 .textCase(.uppercase)
                 .tracking(1.5)
                 .foregroundColor(KTheme.textMuted)
                 .padding(.leading, 4)
+                .accessibilityHidden(true)
 
             Menu {
                 Picker(selection: $selection, label: EmptyView()) {
@@ -220,13 +489,16 @@ struct KPicker<T: Hashable>: View {
             } label: {
                 pickerLabel
             }
+            .accessibilityLabel(label)
+            .accessibilityValue(selectedTitle)
+            .accessibilityIdentifier(identifier ?? label.kIdentifier)
         }
     }
 
     private var pickerLabel: some View {
         HStack {
-            Text(options.first(where: { $0.0 == selection })?.1 ?? "Select…")
-                .font(.system(size: 15, weight: .semibold))
+            Text(selectedTitle)
+                .font(.system(size: bodySize, weight: .semibold))
                 .foregroundColor(.white)
             Spacer()
             Image(systemName: "chevron.down")

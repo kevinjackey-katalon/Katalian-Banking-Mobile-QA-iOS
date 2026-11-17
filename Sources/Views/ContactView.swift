@@ -99,9 +99,14 @@ struct ContactView: View {
                 TextField("Message Concierge…", text: $input)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white)
+                    .textInputAutocapitalization(.sentences)
+                    .submitLabel(.send)
+                    .onSubmit { send() }
                     .padding(14)
                     .background(KTheme.bgBase)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .accessibilityLabel("Message Concierge")
+                    .accessibilityIdentifier("contact_message_input")
                 Button { send() } label: {
                     Image(systemName: "paperplane.fill")
                         .foregroundColor(KTheme.bgBase)
@@ -109,6 +114,8 @@ struct ContactView: View {
                         .background(KTheme.emerald)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                 }
+                .accessibilityLabel("Send message")
+                .accessibilityIdentifier("contact_send")
             }
             .padding(16)
             .background(KTheme.bgBase.opacity(0.5))
